@@ -29,18 +29,28 @@ namespace {
 using namespace vec256;
 
 static void sigmoid_kernel(TensorIterator& iter) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "sigmoid_cpu", [&]() {
-    cpu_kernel_vec(
-        iter,
-        [=](scalar_t a) -> scalar_t { return (1 / (1 + std::exp((-a)))); },
-        [=](Vec256<scalar_t> a) {
-          a = Vec256<scalar_t>((scalar_t)(0)) - a;
-          a = a.exp();
-          a = Vec256<scalar_t>((scalar_t)(1)) + a;
-          a = a.reciprocal();
-          return a;
-        });
-  });
+  if (isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "sigmoid_cpu", [&]() {
+      cpu_kernel(
+          iter,
+          [=](scalar_t a) -> scalar_t {
+            return scalar_t(1.0, 0.0)/(scalar_t(1.0, 0.0) + std::exp((-a))); });
+    });
+  }
+  else{
+    AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "sigmoid_cpu", [&]() {
+      cpu_kernel_vec(
+          iter,
+          [=](scalar_t a) -> scalar_t { return (1 / (1 + std::exp((-a)))); },
+          [=](Vec256<scalar_t> a) {
+            a = Vec256<scalar_t>((scalar_t)(0)) - a;
+            a = a.exp();
+            a = Vec256<scalar_t>((scalar_t)(1)) + a;
+            a = a.reciprocal();
+            return a;
+          });
+    });
+  }
 }
 
 template<typename T>
@@ -53,12 +63,21 @@ uint8_t abs_impl(uint8_t v) {
 }
 
 static void abs_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "abs_cpu", [&]() {
-    cpu_kernel_vec(
-        iter,
-        [=](scalar_t a) -> scalar_t { return abs_impl(a); },
-        [=](Vec256<scalar_t> a) { return a.abs(); });
-  });
+  if (isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "abs_cpu", [&]() {
+      cpu_kernel(
+          iter,
+          [=](scalar_t a) -> scalar_t { return abs_impl(a); });
+    });
+  }
+  else {
+    AT_DISPATCH_ALL_TYPES(iter.dtype(), "abs_cpu", [&]() {
+      cpu_kernel_vec(
+          iter,
+          [=](scalar_t a) -> scalar_t { return abs_impl(a); },
+          [=](Vec256<scalar_t> a) { return a.abs(); });
+    });
+  }
 }
 
 static void bitwise_not_kernel(TensorIterator& iter) {
@@ -82,12 +101,22 @@ static void bitwise_not_kernel(TensorIterator& iter) {
 }
 
 static void frac_kernel(TensorIterator& iter) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "frac_cpu", [&]() {
-    cpu_kernel_vec(
-        iter,
-        [=](scalar_t a) -> scalar_t { return a - std::trunc(a); },
-        [=](Vec256<scalar_t> a) { return a.frac(); });
-  });
+  if (isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "frac_cpu", [&]() {
+      cpu_kernel(
+          iter,
+          [=](scalar_t a) -> scalar_t {
+            return a - scalar_t(std::trunc(std::real(a)), std::trunc(std::imag(a))); });
+    });
+  }
+  else {
+    AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "frac_cpu", [&]() {
+      cpu_kernel_vec(
+          iter,
+          [=](scalar_t a) -> scalar_t { return a - std::trunc(a); },
+          [=](Vec256<scalar_t> a) { return a.frac(); });
+    });
+  }
 }
 
 static void logical_not_kernel(TensorIterator& iter) {
@@ -100,21 +129,40 @@ static void logical_not_kernel(TensorIterator& iter) {
 }
 
 static void reciprocal_kernel(TensorIterator& iter) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "reciprocal_cpu", [&]() {
-    cpu_kernel_vec(
-        iter,
-        [=](scalar_t a) -> scalar_t { return decltype(a)(1.0) / a; },
-        [=](Vec256<scalar_t> a) { return a.reciprocal(); });
-  });
+  if (isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "reciprocal_cpu", [&]() {
+      cpu_kernel(
+          iter,
+          [=](scalar_t a) -> scalar_t {
+            return scalar_t(1.0, 0.0)/a; });
+    });
+  }
+  else {
+    AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "reciprocal_cpu", [&]() {
+      cpu_kernel_vec(
+          iter,
+          [=](scalar_t a) -> scalar_t { return decltype(a)(1.0) / a; },
+          [=](Vec256<scalar_t> a) { return a.reciprocal(); });
+    });
+  }
 }
 
 static void neg_kernel(TensorIterator& iter) {
-  AT_DISPATCH_ALL_TYPES(iter.dtype(), "neg_cpu", [&]() {
-    cpu_kernel_vec(
-        iter,
-        [=](scalar_t a) -> scalar_t { return -a; },
-        [=](Vec256<scalar_t> a) { return a.neg(); });
-  });
+  if (isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "neg_cpu", [&]() {
+      cpu_kernel(
+          iter,
+          [=](scalar_t a) -> scalar_t {return -a; });
+    });
+  }
+  else {
+    AT_DISPATCH_ALL_TYPES(iter.dtype(), "neg_cpu", [&]() {
+      cpu_kernel_vec(
+          iter,
+          [=](scalar_t a) -> scalar_t { return -a; },
+          [=](Vec256<scalar_t> a) { return a.neg(); });
+    });
+  }
 }
 
 static void sign_kernel(TensorIterator& iter){
@@ -141,7 +189,7 @@ static void sign_kernel(TensorIterator& iter){
 }
 
 static void sinh_kernel(TensorIterator& iter) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "sinh_cpu", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND_COMPLEX(iter.dtype(), "sinh_cpu", [&]() {
     cpu_kernel(
         iter,
         [=](scalar_t a) -> scalar_t { return std::sinh(a); });
@@ -149,7 +197,7 @@ static void sinh_kernel(TensorIterator& iter) {
 }
 
 static void cosh_kernel(TensorIterator& iter) {
-  AT_DISPATCH_FLOATING_TYPES(iter.dtype(), "cosh_cpu", [&]() {
+  AT_DISPATCH_FLOATING_TYPES_AND_COMPLEX(iter.dtype(), "cosh_cpu", [&]() {
     cpu_kernel(
         iter,
         [=](scalar_t a) -> scalar_t { return std::cosh(a); });
@@ -265,7 +313,7 @@ static void rsqrt_kernel(TensorIterator& iter) {
     TORCH_INTERNAL_ASSERT(iter.ntensors() == 2);                              \
     AT_DISPATCH_FLOATING_TYPES(iter.dtype(), op##_vml_cpu, [&]() {            \
       iter.serial_for_each(                                                   \
-          [&](char** data_, const int64_t* strides, int64_t n) { \
+          [&](char** data_, const int64_t* strides, int64_t n) {              \
             scalar_t* out_data = reinterpret_cast<scalar_t*>(data_[0]);       \
             scalar_t* in_data = reinterpret_cast<scalar_t*>(data_[1]);        \
             int64_t out_stride = strides[0] / sizeof(scalar_t);               \
@@ -291,6 +339,92 @@ static void rsqrt_kernel(TensorIterator& iter) {
   }                                                                           \
   REGISTER_DISPATCH(op##_stub, &op##_kernel)
 
+// Same as IMPLEMENT_FLOAT_KERNEL, but Complex operations are performed using std::op(a)
+#define IMPLEMENT_COMPLEX_KERNEL(dispatchtypes, op)                             \
+  static void op##_kernel(TensorIterator& iter) {                              \
+    TORCH_INTERNAL_ASSERT(iter.ntensors() == 2);                              \
+    if (isComplexType(iter.dtype())) {                                        \
+          AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), op##_cpu, [&]() {          \
+           cpu_kernel(                                                        \
+                  iter,                                                       \
+                  [=](scalar_t a) -> scalar_t { return (std::op(a)); });            \
+         });                                                                  \
+    }                                                                         \
+    else {                                                                    \
+        AT_DISPATCH_FLOATING_TYPES(iter.dtype(), op##_vml_cpu, [&]() {         \
+          iter.serial_for_each(                                               \
+              [&](char** data_, const int64_t* strides, int64_t n) {          \
+                scalar_t* out_data = reinterpret_cast<scalar_t*>(data_[0]);   \
+                scalar_t* in_data = reinterpret_cast<scalar_t*>(data_[1]);    \
+                int64_t out_stride = strides[0] / sizeof(scalar_t);           \
+                int64_t in_stride = strides[1] / sizeof(scalar_t);            \
+                if (out_stride == 1 && in_stride == 1) {                      \
+                  vml::v##op(out_data, in_data, n);                            \
+                } else {                                                      \
+                  static constexpr int64_t WIDTH = 131072 / sizeof(scalar_t); \
+                  for (int64_t i = 0; i < n; i += WIDTH) {                    \
+                    scalar_t buffer[WIDTH];                                   \
+                    int64_t width = WIDTH;                                    \
+                    width = std::min(width, n - i);                           \
+                    for (int64_t j = 0; j < width; j++)                       \
+                      buffer[j] = in_data[in_stride * (i + j)];               \
+                    vml::v##op(buffer, buffer, width);                         \
+                    for (int64_t j = 0; j < width; j++)                       \
+                      out_data[out_stride * (i + j)] = buffer[j];             \
+                  }                                                           \
+                }                                                             \
+              },                                                              \
+              {0, iter.numel()});                                             \
+        });                                                                   \
+    }                                                                         \
+  }                                                                           \
+  REGISTER_DISPATCH(op##_stub, &op##_kernel)
+
+// Same as IMPLEMENT_COMPLEX_KERNEL, but Complex operations are performed using complex(op(real(a)), op(imag(a))
+// TODO: Replace these kernels with VML calls to real and imag parts
+#define IMPLEMENT_COMPLEX_CARTESIAN_KERNEL(dispatchtypes, op)                             \
+  static void op##_kernel(TensorIterator& iter) {                              \
+    TORCH_INTERNAL_ASSERT(iter.ntensors() == 2);                              \
+    if (isComplexType(iter.dtype())) {                                        \
+          AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), op##_cpu, [&]() {          \
+           cpu_kernel(                                                        \
+                  iter,                                                       \
+                  [=](scalar_t a) -> scalar_t {                               \
+                    return scalar_t(                                      \
+                           std::op(std::real(a)), std::op(std::imag(a))       \
+                    );                                                        \
+                  });                                                         \
+         });                                                                  \
+    }                                                                         \
+    else {                                                                    \
+        AT_DISPATCH_FLOATING_TYPES(iter.dtype(), op##_vml_cpu, [&]() {         \
+          iter.serial_for_each(                                               \
+              [&](char** data_, const int64_t* strides, int64_t n) {          \
+                scalar_t* out_data = reinterpret_cast<scalar_t*>(data_[0]);   \
+                scalar_t* in_data = reinterpret_cast<scalar_t*>(data_[1]);    \
+                int64_t out_stride = strides[0] / sizeof(scalar_t);           \
+                int64_t in_stride = strides[1] / sizeof(scalar_t);            \
+                if (out_stride == 1 && in_stride == 1) {                      \
+                  vml::v##op(out_data, in_data, n);                            \
+                } else {                                                      \
+                  static constexpr int64_t WIDTH = 131072 / sizeof(scalar_t); \
+                  for (int64_t i = 0; i < n; i += WIDTH) {                    \
+                    scalar_t buffer[WIDTH];                                   \
+                    int64_t width = WIDTH;                                    \
+                    width = std::min(width, n - i);                           \
+                    for (int64_t j = 0; j < width; j++)                       \
+                      buffer[j] = in_data[in_stride * (i + j)];               \
+                    vml::v##op(buffer, buffer, width);                         \
+                    for (int64_t j = 0; j < width; j++)                       \
+                      out_data[out_stride * (i + j)] = buffer[j];             \
+                  }                                                           \
+                }                                                             \
+              },                                                              \
+              {0, iter.numel()});                                             \
+        });                                                                   \
+    }                                                                         \
+  }                                                                           \
+  REGISTER_DISPATCH(op##_stub, &op##_kernel)
 } // anonymous namespace
 
 REGISTER_DISPATCH(rsqrt_stub, &rsqrt_kernel);
@@ -311,27 +445,27 @@ REGISTER_DISPATCH(trigamma_stub, &trigamma_kernel);
 REGISTER_DISPATCH(polygamma_stub, &polygamma_kernel);
 
 // IMPLEMENT_FLOAT_KERNEL(ALL, abs)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, acos)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, asin)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, atan)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, ceil)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, cos)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, acos)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, asin)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, atan)
+IMPLEMENT_COMPLEX_CARTESIAN_KERNEL(FLOATING, ceil)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, cos)
 // IMPLEMENT_FLOAT_KERNEL(FLOATING, cosh)
 IMPLEMENT_FLOAT_KERNEL(FLOATING, erf)
 IMPLEMENT_FLOAT_KERNEL(FLOATING, erfc)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, exp)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, exp)
 IMPLEMENT_FLOAT_KERNEL(FLOATING, expm1)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, floor)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, log)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, log10)
+IMPLEMENT_COMPLEX_CARTESIAN_KERNEL(FLOATING, floor)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, log)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, log10)
 IMPLEMENT_FLOAT_KERNEL(FLOATING, log1p)
 IMPLEMENT_FLOAT_KERNEL(FLOATING, log2)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, round)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, sin)
+IMPLEMENT_COMPLEX_CARTESIAN_KERNEL(FLOATING, round)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, sin)
 // IMPLEMENT_FLOAT_KERNEL(FLOATING, sinh)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, sqrt)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, tan)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, tanh)
-IMPLEMENT_FLOAT_KERNEL(FLOATING, trunc)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, sqrt)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, tan)
+IMPLEMENT_COMPLEX_KERNEL(FLOATING, tanh)
+IMPLEMENT_COMPLEX_CARTESIAN_KERNEL(FLOATING, trunc)
 
 }} // namespace at::native
