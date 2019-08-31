@@ -12,11 +12,8 @@ namespace {
 template <typename self_T>
 void copy_kernel_cast(TensorIterator& iter) {
     if (isComplexType(iter.dtype(1))) {
-      AT_DISPATCH_COMPLEX_TYPES(
-        iter.dtype(1),
-        "copy_kernel_cast",
-        [&] {
-          cpu_kernel(iter, [=](scalar_t a) -> self_T {
+      AT_DISPATCH_COMPLEX_TYPES(iter.dtype(1), "copy_kernel_cast", [&] {
+        cpu_kernel(iter, [=](scalar_t a) -> self_T {
             return static_cast<self_T>(
                 static_cast<at::native::inter_copy_type_t<self_T>>(std::real(a)));
           });
@@ -53,12 +50,11 @@ static void copy_kernel(TensorIterator& iter, bool non_blocking) {
             [=](scalar_t a) -> scalar_t {return a; });
       });
     } else if (isComplexType(dtype)) {
-        AT_DISPATCH_COMPLEX_TYPES_AND(
-          ScalarType::Bool, dtype, "copy_kernel", [&] {
-            cpu_kernel(
-                iter,
-                [=](scalar_t a) -> scalar_t { return a; });
-          });
+      AT_DISPATCH_COMPLEX_TYPES(dtype, "copy_kernel", [&] {
+          cpu_kernel(
+            iter,
+            [=](scalar_t a) -> scalar_t { return a; });
+        });
     }
      else {
       AT_DISPATCH_ALL_TYPES_AND(

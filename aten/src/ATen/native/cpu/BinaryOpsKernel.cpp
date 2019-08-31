@@ -14,11 +14,8 @@ namespace {
 using namespace vec256;
 
 void add_kernel(TensorIterator& iter, Scalar alpha_scalar) {
-  if (iter.dtype() == ScalarType::Bool) {
-    auto alpha = alpha_scalar.to<bool>();
-    cpu_kernel(iter, [=](bool a, bool b) -> bool { return a + b * alpha; });
-  } else if (isComplexType(iter.dtype())) {
-    AT_DISPATCH_COMPLEX_TYPES_AND(kBFloat16, iter.dtype(), "add_cpu/sub_cpu", [&]() {
+  if (iter.dtype() == ScalarType::Bool || isComplexType(iter.dtype())) {
+    AT_DISPATCH_COMPLEX_TYPES_AND(kBool, iter.dtype(), "add_cpu/sub_cpu", [&]() {
       auto alpha = alpha_scalar.to<scalar_t>();
       cpu_kernel(iter,
         [=](scalar_t a, scalar_t b) -> scalar_t { return a + alpha * b; });
@@ -55,7 +52,7 @@ void mul_kernel(TensorIterator& iter) {
   if (iter.dtype() == ScalarType::Bool) {
     cpu_kernel(iter, [=](bool a, bool b) -> bool { return a && b; });
   } else if (isComplexType(iter.dtype())) {
-      AT_DISPATCH_COMPLEX_TYPES_AND(kBFloat16, iter.dtype(), "mul_cpu", [&]() {
+      AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "mul_cpu", [&]() {
         cpu_kernel(iter,
           [=](scalar_t a, scalar_t b) -> scalar_t { return a * b; });
      });
@@ -80,7 +77,7 @@ void div_kernel(TensorIterator& iter) {
       });
     });
   } else if (isComplexType(iter.dtype())) {
-      AT_DISPATCH_COMPLEX_TYPES_AND(kBFloat16, iter.dtype(), "div_cpu", [&]() {
+      AT_DISPATCH_COMPLEX_TYPES(iter.dtype(), "div_cpu", [&]() {
         cpu_kernel(iter,
           [=](scalar_t a, scalar_t b) __ubsan_ignore_float_divide_by_zero__ -> scalar_t {
              return a / b;
